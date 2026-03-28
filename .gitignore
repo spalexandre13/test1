@@ -1,0 +1,15 @@
+# Fichiers générés par les scans
+statut_audit.json
+resultat_audit.json
+rapport_simple.pdf
+rapport_avance.pdf
+rapport.pdf
+radar_tmp.png
+
+# Python
+__pycache__/
+*.pyc
+
+# Le .env et git-exposed du site de test sont des failles volontaires (à garder)
+!site-test/.env
+!site-test/git-exposed/

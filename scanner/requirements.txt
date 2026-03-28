@@ -1,0 +1,3 @@
+fpdf
+matplotlib
+numpy

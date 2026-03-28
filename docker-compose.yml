@@ -1,0 +1,45 @@
+# ══════════════════════════════════════════════════════════════
+#  BouzuSec Scanner — Docker Compose
+#  Lance le scanner + un site de test vulnérable
+# ══════════════════════════════════════════════════════════════
+#
+#  Démarrage :  docker compose up -d --build
+#  Arrêt :      docker compose down
+#
+#  Accès :
+#    - Scanner BouzuSec : http://localhost:8080
+#    - Site vulnérable :  http://localhost:8888
+#
+# ══════════════════════════════════════════════════════════════
+
+services:
+
+  # ── Scanner BouzuSec ────────────────────────────────────────
+  bouzusec:
+    build:
+      context: ./scanner
+      dockerfile: Dockerfile
+    container_name: bouzusec-scanner
+    ports:
+      - "9090:80"
+    networks:
+      - bouzusec-net
+    depends_on:
+      - site-test
+    restart: unless-stopped
+
+  # ── Site de Test Vulnérable ─────────────────────────────────
+  site-test:
+    build:
+      context: ./site-test
+      dockerfile: Dockerfile
+    container_name: site-vulnerable
+    ports:
+      - "8888:80"
+    networks:
+      - bouzusec-net
+    restart: unless-stopped
+
+networks:
+  bouzusec-net:
+    driver: bridge
