@@ -179,3 +179,19 @@ test("messageErreurSmtp traduit les pannes SMTP en conseil actionnable", () => {
   // Une erreur inconnue doit etre transmise telle quelle, pas avalee.
   assert.equal(messageErreurSmtp(new Error("boom inattendu")), "boom inattendu");
 });
+
+test("le transport Gmail borne ses timeouts (sinon 2 min de blocage)", async () => {
+  process.env.GMAIL_USER = "test@example.com";
+  process.env.GMAIL_PASS = "motdepasse";
+  const { getMailer } = await import("../src/lib/mailer");
+  const opts = (getMailer() as unknown as { options: Record<string, unknown> }).options;
+
+  assert.ok(
+    typeof opts.connectionTimeout === "number" && opts.connectionTimeout <= 15_000,
+    `connectionTimeout absent ou trop long : ${opts.connectionTimeout}`
+  );
+  assert.ok(
+    typeof opts.greetingTimeout === "number" && opts.greetingTimeout <= 15_000,
+    `greetingTimeout absent ou trop long : ${opts.greetingTimeout}`
+  );
+});

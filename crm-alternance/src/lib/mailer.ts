@@ -11,7 +11,15 @@ export function getMailer(): Transporter {
       "GMAIL_USER / GMAIL_PASS manquants dans .env (utilise un mot de passe d'application Gmail)."
     );
   }
-  cache = nodemailer.createTransport({ service: "gmail", auth: { user, pass } });
+  cache = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass },
+    // Sans ces bornes, Nodemailer attend 2 minutes avant d'abandonner : la page
+    // de diagnostic parait figee et la fonction depasse le plafond de Vercel.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000
+  });
   return cache;
 }
 
