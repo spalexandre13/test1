@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { genererResume, genererEmail, genererAdaptationCv } from "@/lib/generation";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 // Genere resume + email + adaptation CV pour une entreprise donnee.
 export async function POST(request: Request) {

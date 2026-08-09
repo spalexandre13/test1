@@ -5,7 +5,7 @@ import { genererPdf } from "@/lib/cv";
 import { titreParDefaut } from "@/lib/cv-data";
 
 type Ctx = { params: { id: string } };
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 const RE_EMAIL = /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i;
 

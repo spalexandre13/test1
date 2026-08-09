@@ -8,6 +8,7 @@ le pipeline.
 ## Sommaire
 
 - [Installation](#installation)
+- [Déployer sur Vercel](#déployer-sur-vercel)
 - [Configuration du .env](#configuration-du-env)
 - [⚠️ Accès réseau requis](#-accès-réseau-requis)
 - [Utilisation](#utilisation)
@@ -22,16 +23,85 @@ le pipeline.
 cd crm-alternance
 cp .env.example .env        # puis remplis les valeurs (voir plus bas)
 npm install
-npx prisma db push          # crée prisma/dev.db
+npm run db:local            # crée prisma/dev.db (SQLite)
 npm run db:seed             # insère le modèle de mail par défaut
 npm run dev                 # http://localhost:3000
 ```
+
+
+## Déployer sur Vercel
+
+L'application tourne sur Vercel, mais **pas avec la configuration locale** : le
+disque y est éphémère (SQLite impossible) et les fonctions sont limitées en
+taille (Chromium complet impossible). Le code gère déjà les deux cas :
+
+| | En local | Sur Vercel |
+|---|---|---|
+| Base | SQLite (`npm run db:local`) | PostgreSQL (`DATABASE_URL`) |
+| Chromium | `puppeteer` (devDependency) | `@sparticuz/chromium` |
+| Accès | libre | **mot de passe obligatoire** |
+
+### 1. Créer une base PostgreSQL
+
+N'importe quel fournisseur convient. Le plus simple : dans ton projet Vercel,
+onglet **Storage → Create Database → Neon** (gratuit). Vercel renseigne alors
+`DATABASE_URL` tout seul. Sinon, crée-la sur [neon.tech](https://neon.tech) ou
+[supabase.com](https://supabase.com) et copie l'URL de connexion.
+
+### 2. Importer le dépôt
+
+Sur [vercel.com/new](https://vercel.com/new), importe `spalexandre13/BouzuSec`,
+puis **règle le Root Directory sur `crm-alternance`** (l'application n'est pas à
+la racine du dépôt).
+
+### 3. Renseigner les variables d'environnement
+
+Dans **Settings → Environment Variables** :
+
+| Variable | Valeur |
+|---|---|
+| `DATABASE_URL` | l'URL PostgreSQL de l'étape 1 |
+| `APP_PASSWORD` | **un mot de passe que tu choisis** — voir ci-dessous |
+| `GMAIL_USER` | ton adresse Gmail |
+| `GMAIL_PASS` | ton mot de passe d'application (16 caractères) |
+| `GROQ_API_KEY` | ta clé Groq |
+| `AI_PROVIDER` | `groq` (Ollama tourne en local, pas sur Vercel) |
+| `SENDER_NAME`, `SENDER_EMAIL`, `PORTFOLIO_URL` | ton identité |
+
+### 4. Déployer, puis initialiser les données
+
+Le build lance `prisma db push` automatiquement (voir `vercel.json`), donc les
+tables sont créées au premier déploiement. Pour insérer le modèle de mail :
+
+```bash
+DATABASE_URL="<ton-url-postgres>" npm run db:seed
+```
+
+### ⚠️ Pourquoi le mot de passe est obligatoire
+
+Une URL Vercel est **publique**. Sans protection, n'importe qui la trouvant
+pourrait envoyer des mails depuis ton compte Gmail et vider ton quota Groq.
+
+L'application refuse donc de démarrer en public tant que `APP_PASSWORD` n'est
+pas défini : elle répond `503` avec un message explicite, plutôt que de
+s'exposer. Une fois la variable posée, le navigateur demande le mot de passe
+(authentification HTTP standard, l'identifiant n'a pas d'importance) et le
+retient — sur téléphone, tu ne le saisis qu'une fois.
+
+Pages **et** routes API sont protégées.
+
+### Ce qui change une fois déployé
+
+- **Ollama ne fonctionne plus** (il tourne sur ta machine) : utilise Groq.
+- La génération du CV PDF est plus lente au premier appel (démarrage à froid).
+- Les fonctions sont plafonnées à 60 s (limite du plan Hobby).
 
 ## Configuration du `.env`
 
 | Variable | Requis | Rôle |
 |---|---|---|
-| `DATABASE_URL` | oui | Laisse `file:./dev.db` |
+| `DATABASE_URL` | oui | `file:./dev.db` en local, URL PostgreSQL sur Vercel |
+| `APP_PASSWORD` | en public | Mot de passe d'accès — **obligatoire sur Vercel** |
 | `SENDER_NAME`, `SENDER_EMAIL` | oui | Identité affichée dans le mail et le CV |
 | `PORTFOLIO_URL` | oui | Lien portfolio du CV |
 | `GMAIL_USER` | oui | Ton adresse Gmail |

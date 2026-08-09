@@ -8,3 +8,4 @@ prisma/*.db-journal
 .DS_Store
 tsconfig.tsbuildinfo
 next-env.d.ts
+prisma/schema.sqlite.prisma

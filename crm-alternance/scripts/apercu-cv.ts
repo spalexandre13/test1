@@ -3,15 +3,11 @@ import { chargerEnv } from "../src/lib/charger-env";
 
 chargerEnv();
 
-import puppeteer from "puppeteer";
+import { lancerNavigateur } from "../src/lib/navigateur";
 import { construireHtmlCv } from "../src/lib/cv";
 
 async function main() {
-  const nav = await puppeteer.launch({
-    headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
-  });
+  const nav = await lancerNavigateur();
   const page = await nav.newPage();
   await page.setViewport({ width: 794, height: 1123 });
   await page.setContent(

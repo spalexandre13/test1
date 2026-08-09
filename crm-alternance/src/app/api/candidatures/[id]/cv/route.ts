@@ -3,7 +3,7 @@ import { genererPdf } from "@/lib/cv";
 import { titreParDefaut } from "@/lib/cv-data";
 
 type Ctx = { params: { id: string } };
-export const maxDuration = 120;
+export const maxDuration = 60;
 
 export async function GET(_r: Request, { params }: Ctx) {
   const c = await prisma.candidature.findUnique({ where: { id: params.id } });

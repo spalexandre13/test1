@@ -1,4 +1,5 @@
-import puppeteer, { type Browser } from "puppeteer";
+import type { Browser } from "puppeteer-core";
+import { lancerNavigateur } from "./navigateur";
 import { CV_DATA } from "./cv-data";
 
 export type AdaptationCv = { titre_cv: string; top_4_competences: string[] };
@@ -65,12 +66,7 @@ ${experiences.map((e) => `<div class="bloc"><div class="bt"><span>${esc(e.intitu
 export async function genererPdf(a: AdaptationCv): Promise<Buffer> {
   let navigateur: Browser | null = null;
   try {
-    navigateur = await puppeteer.launch({
-      headless: true,
-      // Permet de pointer un Chromium deja installe (utile en conteneur).
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-    });
+    navigateur = await lancerNavigateur();
     const page = await navigateur.newPage();
     await page.setContent(construireHtmlCv(a), { waitUntil: "domcontentloaded" });
     const pdf = await page.pdf({
@@ -82,7 +78,7 @@ export async function genererPdf(a: AdaptationCv): Promise<Buffer> {
   } catch (e) {
     const m = e instanceof Error ? e.message : String(e);
     throw new Error(
-      `Génération du CV PDF impossible : ${m}. Si Chromium manque, lance "npx puppeteer browsers install chrome" ou renseigne PUPPETEER_EXECUTABLE_PATH dans .env.`
+      `Génération du CV PDF impossible : ${m}. Si Chromium manque en local, lance "npx puppeteer browsers install chrome" ou renseigne PUPPETEER_EXECUTABLE_PATH.`
     );
   } finally {
     await navigateur?.close();
