@@ -1,0 +1,32 @@
+// Geocodage via l'API Adresse (data.gouv.fr), publique et sans cle.
+export type Coordonnees = { lat: number; lon: number; ville: string; codePostal?: string };
+
+type ReponseGeo = {
+  features?: Array<{
+    geometry?: { coordinates?: [number, number] };
+    properties?: Record<string, any>;
+  }>;
+};
+
+export function normaliserGeocodage(data: ReponseGeo): Coordonnees | null {
+  const f = data?.features?.[0];
+  const coords = f?.geometry?.coordinates;
+  if (!coords || coords.length < 2) return null;
+  const [lon, lat] = coords;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return {
+    lat,
+    lon,
+    ville: String(f?.properties?.city ?? f?.properties?.label ?? ""),
+    codePostal: f?.properties?.postcode ? String(f.properties.postcode) : undefined
+  };
+}
+
+export async function geocoder(requete: string, signal?: AbortSignal): Promise<Coordonnees | null> {
+  const res = await fetch(
+    `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(requete)}&limit=1`,
+    { cache: "no-store", signal }
+  );
+  if (!res.ok) throw new Error(`API Adresse ${res.status}`);
+  return normaliserGeocodage((await res.json()) as ReponseGeo);
+}

@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ModeleEmail {
+  id        String   @id @default(cuid())
+  nom       String   @unique
+  objet     String
+  contenu   String
+  estDefaut Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Entreprise {
+  id     String  @id @default(cuid())
+  nom    String
+  siret  String? @unique
+  siren  String?
+  naf    String?
+  nafLibelle String?
+
+  adresse    String?
+  ville      String?
+  codePostal String?
+  latitude   Float?
+  longitude  Float?
+
+  siteWeb String?
+
+  // --- Contacts (priorite : RH > entreprise) ---
+  emailRh         String?
+  emailEntreprise String?
+  telephone       String?
+  contactsJson    String?  // toutes les pistes trouvees, en JSON
+  contactsMajLe   DateTime?
+
+  descriptionBrute  String?
+  descriptionCourte String?
+
+  scorePertinence Int?
+  categorie       String?
+  signauxJson     String?
+  proposeAlternance Boolean @default(false)
+
+  source    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidatures Candidature[]
+
+  @@index([scorePertinence])
+}
+
+model Candidature {
+  id           String     @id @default(cuid())
+  entrepriseId String
+  entreprise   Entreprise @relation(fields: [entrepriseId], references: [id], onDelete: Cascade)
+
+  statut String @default("A_VALIDER")
+  // A_VALIDER | ENVOYEE | RELANCE_A_FAIRE | REPONSE_POSITIVE | REPONSE_NEGATIVE
+
+  destinataire String?
+  cc           String?
+  objet        String?
+  corpsEmail   String?
+
+  titreCv         String?
+  top4Competences String?
+
+  dateEnvoi         DateTime?
+  dateRelancePrevue DateTime?
+  dateReponse       DateTime?
+  notes             String?
+  erreurEnvoi       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([statut])
+  @@index([entrepriseId])
+}
