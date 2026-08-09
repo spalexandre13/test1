@@ -39,43 +39,53 @@ taille (Chromium complet impossible). Le code gère déjà les deux cas :
 |---|---|---|
 | Base | SQLite (`npm run db:local`) | PostgreSQL (`DATABASE_URL`) |
 | Chromium | `puppeteer` (devDependency) | `@sparticuz/chromium` |
+| Données initiales | `npm run db:seed` | insérées automatiquement |
 | Accès | libre | **mot de passe obligatoire** |
 
-### 1. Créer une base PostgreSQL
+### Méthode A — depuis un téléphone, sans ordinateur (recommandée)
 
-N'importe quel fournisseur convient. Le plus simple : dans ton projet Vercel,
-onglet **Storage → Create Database → Neon** (gratuit). Vercel renseigne alors
-`DATABASE_URL` tout seul. Sinon, crée-la sur [neon.tech](https://neon.tech) ou
-[supabase.com](https://supabase.com) et copie l'URL de connexion.
+Le dépôt contient un workflow GitHub Actions
+(`.github/workflows/deploy-vercel.yml`) qui fait tout le déploiement. Tu n'as
+qu'à déposer des secrets depuis le navigateur de ton téléphone.
 
-### 2. Importer le dépôt
+**1. Créer une base PostgreSQL gratuite**
 
-Sur [vercel.com/new](https://vercel.com/new), importe `spalexandre13/BouzuSec`,
-puis **règle le Root Directory sur `crm-alternance`** (l'application n'est pas à
-la racine du dépôt).
+Sur [neon.tech](https://neon.tech) → inscription → *Create project* → copie la
+chaîne de connexion (`postgresql://…?sslmode=require`).
 
-### 3. Renseigner les variables d'environnement
+**2. Créer un jeton Vercel**
 
-Dans **Settings → Environment Variables** :
+Sur [vercel.com/account/tokens](https://vercel.com/account/tokens) → *Create
+Token* → portée « Full Account » → copie-le (il ne sera plus affiché ensuite).
 
-| Variable | Valeur |
-|---|---|
-| `DATABASE_URL` | l'URL PostgreSQL de l'étape 1 |
-| `APP_PASSWORD` | **un mot de passe que tu choisis** — voir ci-dessous |
-| `GMAIL_USER` | ton adresse Gmail |
-| `GMAIL_PASS` | ton mot de passe d'application (16 caractères) |
-| `GROQ_API_KEY` | ta clé Groq |
-| `AI_PROVIDER` | `groq` (Ollama tourne en local, pas sur Vercel) |
-| `SENDER_NAME`, `SENDER_EMAIL`, `PORTFOLIO_URL` | ton identité |
+**3. Déposer les secrets sur GitHub**
 
-### 4. Déployer, puis initialiser les données
+Dépôt → **Settings → Secrets and variables → Actions → New repository secret**.
+À créer un par un :
 
-Le build lance `prisma db push` automatiquement (voir `vercel.json`), donc les
-tables sont créées au premier déploiement. Pour insérer le modèle de mail :
+| Secret | Valeur | Obligatoire |
+|---|---|---|
+| `VERCEL_TOKEN` | le jeton de l'étape 2 | oui |
+| `DATABASE_URL` | l'URL Neon de l'étape 1 | oui |
+| `APP_PASSWORD` | un mot de passe que tu choisis | oui |
+| `GMAIL_USER` | ton adresse Gmail | pour l'envoi |
+| `GMAIL_PASS` | ton mot de passe d'application Gmail | pour l'envoi |
+| `GROQ_API_KEY` | ta clé [Groq](https://console.groq.com/keys) | pour l'IA |
+| `SENDER_NAME`, `SENDER_EMAIL`, `PORTFOLIO_URL` | ton identité | optionnels |
 
-```bash
-DATABASE_URL="<ton-url-postgres>" npm run db:seed
-```
+**4. Lancer le déploiement**
+
+Onglet **Actions → Déployer sur Vercel → Run workflow**. Le workflow vérifie les
+secrets, lance les tests, publie les variables sur Vercel, déploie, puis teste
+que le site répond. L'adresse finale s'affiche dans le résumé du run.
+
+Si un secret manque, le workflow s'arrête immédiatement en le nommant.
+
+### Méthode B — depuis le tableau de bord Vercel
+
+Sur [vercel.com/new](https://vercel.com/new), importe le dépôt, **règle le Root
+Directory sur `crm-alternance`**, puis ajoute les mêmes variables dans
+*Settings → Environment Variables*.
 
 ### ⚠️ Pourquoi le mot de passe est obligatoire
 

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { assurerDonneesInitiales } from "@/lib/init";
 
 export async function GET() {
+  await assurerDonneesInitiales();
   return NextResponse.json(await prisma.modeleEmail.findMany({ orderBy: { createdAt: "desc" } }));
 }
 

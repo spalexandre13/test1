@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { assurerDonneesInitiales } from "@/lib/init";
 import { verifierSmtp } from "@/lib/mailer";
 import { fournisseurActuel } from "@/lib/ai";
 
@@ -8,6 +9,7 @@ export const maxDuration = 60;
 
 // Page de diagnostic : dit precisement ce qui est configure et ce qui repond.
 export async function GET() {
+  await assurerDonneesInitiales();
   const checks: Array<{ nom: string; ok: boolean; detail: string }> = [];
 
   try {

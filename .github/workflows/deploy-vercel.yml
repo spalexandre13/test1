@@ -1,0 +1,161 @@
+# Deploiement du CRM sur Vercel depuis GitHub Actions.
+#
+# Raison d'etre : permettre un deploiement sans aucun ordinateur. Les secrets
+# sont ajoutes depuis l'interface GitHub (utilisable sur telephone), le runner
+# fait le reste et ses logs sont lisibles dans l'onglet Actions.
+name: Deployer sur Vercel
+
+on:
+  workflow_dispatch:
+    inputs:
+      environnement:
+        description: "Cible du deploiement"
+        type: choice
+        options: [production, preview]
+        default: production
+  push:
+    branches: [claude/job-application-crm-Ykn7B]
+    paths:
+      - "crm-alternance/**"
+      - ".github/workflows/deploy-vercel.yml"
+
+concurrency:
+  group: deploy-vercel
+  cancel-in-progress: false
+
+jobs:
+  deployer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crm-alternance
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: crm-alternance/package-lock.json
+
+      - name: Verifier les secrets obligatoires
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        run: |
+          manquants=""
+          for v in VERCEL_TOKEN DATABASE_URL APP_PASSWORD; do
+            if [ -z "${!v}" ]; then manquants="$manquants $v"; fi
+          done
+          if [ -n "$manquants" ]; then
+            echo "::error::Secrets manquants :$manquants"
+            echo "Ajoute-les dans Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          echo "Secrets obligatoires presents."
+
+      - name: Controles avant deploiement
+        run: |
+          npm ci
+          npx prisma generate
+          npm run typecheck
+          npm test
+
+      - name: Installer la CLI Vercel
+        run: npm install --global vercel@latest
+
+      - name: Lier le projet Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          vercel link --yes --project crm-alternance --token "$VERCEL_TOKEN"
+          echo "Projet lie."
+
+      - name: Publier les variables d'environnement
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          CIBLE: ${{ github.event.inputs.environnement || 'production' }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SENDER_NAME: ${{ secrets.SENDER_NAME }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          PORTFOLIO_URL: ${{ secrets.PORTFOLIO_URL }}
+        run: |
+          set -u
+          publier() {
+            nom="$1"; valeur="$2"
+            if [ -z "$valeur" ]; then
+              echo "  - $nom : absent, ignore"
+              return
+            fi
+            # Remplacement : on retire l'existante avant de la reposer.
+            vercel env rm "$nom" "$CIBLE" --yes --token "$VERCEL_TOKEN" >/dev/null 2>&1 || true
+            printf '%s' "$valeur" | vercel env add "$nom" "$CIBLE" --token "$VERCEL_TOKEN" >/dev/null
+            echo "  - $nom : publie"
+          }
+
+          echo "Variables publiees sur $CIBLE :"
+          publier DATABASE_URL   "$DATABASE_URL"
+          publier APP_PASSWORD   "$APP_PASSWORD"
+          publier GMAIL_USER     "$GMAIL_USER"
+          publier GMAIL_PASS     "$GMAIL_PASS"
+          publier GROQ_API_KEY   "$GROQ_API_KEY"
+          publier AI_PROVIDER    "groq"
+          publier SENDER_NAME    "${SENDER_NAME:-Alexandre}"
+          publier SENDER_EMAIL   "${SENDER_EMAIL:-$GMAIL_USER}"
+          publier PORTFOLIO_URL  "${PORTFOLIO_URL:-https://spalexandre13.github.io/Portfolio/}"
+
+      - name: Deployer
+        id: deploiement
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          CIBLE: ${{ github.event.inputs.environnement || 'production' }}
+        run: |
+          if [ "$CIBLE" = "production" ]; then
+            url=$(vercel deploy --prod --yes --token "$VERCEL_TOKEN")
+          else
+            url=$(vercel deploy --yes --token "$VERCEL_TOKEN")
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deploiement termine : $url"
+
+      - name: Verifier que le site repond
+        env:
+          URL: ${{ steps.deploiement.outputs.url }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        run: |
+          echo "Test de $URL"
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$URL/")
+          echo "  sans mot de passe -> $code (401 attendu : la protection fonctionne)"
+          if [ "$code" != "401" ]; then
+            echo "::warning::Reponse inattendue sans identifiants : $code"
+          fi
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 -u "crm:$APP_PASSWORD" "$URL/")
+          echo "  avec mot de passe -> $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Le site ne repond pas correctement (HTTP $code)."
+            exit 1
+          fi
+
+      - name: Recapitulatif
+        if: always()
+        env:
+          URL: ${{ steps.deploiement.outputs.url }}
+        run: |
+          {
+            echo "## Deploiement"
+            if [ -n "${URL:-}" ]; then
+              echo ""
+              echo "**Adresse :** $URL"
+              echo ""
+              echo "Identifiant : n'importe lequel — Mot de passe : celui de \`APP_PASSWORD\`."
+            else
+              echo ""
+              echo "Le deploiement n'a pas abouti. Voir les etapes ci-dessus."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
