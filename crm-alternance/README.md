@@ -228,6 +228,20 @@ bornes de mots, normalisation des réponses d'API (formes multiples), fusion
 multi-source, échappement HTML du CV, refus des compétences inventées, garde-fou
 anti-formules-IA, messages d'erreur SMTP.
 
+## Éprouver la chaîne complète sans réseau
+
+Pour vérifier tout le parcours (recherche → contacts → génération → envoi) sans
+compte ni connexion, des serveurs locaux imitent les services externes :
+
+```bash
+node scripts/faux-services.mjs     # dans un terminal
+```
+
+Puis décommente les surcharges `API_ADRESSE_URL`, `ANNUAIRE_URL`, `LBA_URL`,
+`GROQ_BASE_URL`, `SMTP_HOST` et `SMTP_PORT` dans `.env` et relance l'app. Les
+mails partent vers un SMTP local qui les affiche dans la console au lieu de les
+expédier.
+
 ## Dépannage
 
 | Symptôme | Cause / solution |

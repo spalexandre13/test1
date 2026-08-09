@@ -6,6 +6,9 @@
 // ci-dessous accepte plusieurs formes pour ne pas casser silencieusement.
 import { type EntrepriseBrute, normaliserNaf, cleDedoublonnage } from "./types";
 
+// Surchargeable pour les tests locaux.
+const BASE = process.env.LBA_URL ?? "https://labonnealternance.apprentissage.beta.gouv.fr";
+
 export const ROME_RT = ["M1810", "M1802", "M1801", "M1805", "I1401", "M1803"];
 
 type ReponseLba = {
@@ -85,7 +88,7 @@ export async function chercherLba(opts: {
   if (process.env.LBA_API_KEY) headers.authorization = `Bearer ${process.env.LBA_API_KEY}`;
 
   const res = await fetch(
-    `https://labonnealternance.apprentissage.beta.gouv.fr/api/v1/jobs/company?${params}`,
+    `${BASE}/api/v1/jobs/company?${params}`,
     { headers, cache: "no-store", signal: opts.signal }
   );
   if (!res.ok) throw new Error(`La Bonne Alternance ${res.status} : ${await res.text()}`);

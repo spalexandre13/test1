@@ -3,7 +3,8 @@
 // Doc : https://recherche-entreprises.api.gouv.fr/docs
 import { type EntrepriseBrute, normaliserNaf, cleDedoublonnage } from "./types";
 
-const BASE = "https://recherche-entreprises.api.gouv.fr/search";
+// Surchargeable pour les tests locaux.
+const BASE = `${process.env.ANNUAIRE_URL ?? "https://recherche-entreprises.api.gouv.fr"}/search`;
 
 // Codes NAF cibles pour un profil reseaux / telecoms / cyber.
 export const NAF_CIBLES = [

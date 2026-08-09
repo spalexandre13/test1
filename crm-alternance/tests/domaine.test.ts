@@ -145,3 +145,31 @@ test("analyserEmail signale longueur et exces de puces", () => {
 test("compterMots ignore les espaces multiples", () => {
   assert.equal(compterMots("  un   deux \n trois "), 3);
 });
+
+test("les bonus ne peuvent pas faire remonter une entreprise hors-domaine", () => {
+  // Une boulangerie toute proche qui propose de l'alternance et affiche un
+  // contact ne doit pas apparaitre dans une recherche reseau / cyber.
+  const r = scorerEntreprise({
+    nom: "Boulangerie du Coin",
+    naf: "1071C",
+    description: "Fabrication de pain",
+    proposeAlternance: true,
+    aContact: true,
+    distanceKm: 1
+  });
+  assert.equal(r.score, 0, `score attendu 0, recu ${r.score}`);
+  assert.equal(r.categorie, "hors-domaine");
+  assert.deepEqual(r.signaux, [], "aucun signal ne doit etre affiche");
+});
+
+test("une entreprise du domaine conserve bien ses bonus", () => {
+  const nu = scorerEntreprise({ nom: "Reseau Plus", naf: "6203Z" });
+  const avecBonus = scorerEntreprise({
+    nom: "Reseau Plus",
+    naf: "6203Z",
+    proposeAlternance: true,
+    aContact: true,
+    distanceKm: 2
+  });
+  assert.ok(avecBonus.score > nu.score, "les bonus doivent s'appliquer au domaine");
+});

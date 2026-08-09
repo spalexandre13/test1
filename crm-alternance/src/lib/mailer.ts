@@ -11,8 +11,18 @@ export function getMailer(): Transporter {
       "GMAIL_USER / GMAIL_PASS manquants dans .env (utilise un mot de passe d'application Gmail)."
     );
   }
+  // SMTP_HOST permet de viser un serveur local pour les tests ; sinon Gmail.
+  const surcharge = process.env.SMTP_HOST
+    ? {
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT ?? 1025),
+        secure: false,
+        ignoreTLS: true
+      }
+    : { service: "gmail" };
+
   cache = nodemailer.createTransport({
-    service: "gmail",
+    ...surcharge,
     auth: { user, pass },
     // Sans ces bornes, Nodemailer attend 2 minutes avant d'abandonner : la page
     // de diagnostic parait figee et la fonction depasse le plafond de Vercel.

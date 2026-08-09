@@ -111,6 +111,13 @@ export function scorerEntreprise(e: EntreeScoring): ScorePertinence {
     }
   }
 
+  // Les bonus qui suivent ne qualifient PAS le metier : sans le moindre signal
+  // NAF ou mot-cle, l'entreprise est hors-domaine et ne doit pas remonter
+  // (sinon une boulangerie proche apparaitrait dans une recherche reseau).
+  if (brut === 0) {
+    return { score: 0, categorie: "hors-domaine", signaux: [] };
+  }
+
   // 3) Bonus operationnels.
   if (e.proposeAlternance) {
     brut += 15;
@@ -129,11 +136,8 @@ export function scorerEntreprise(e: EntreeScoring): ScorePertinence {
     }
   }
 
-  const categorie =
-    brut === 0
-      ? "hors-domaine"
-      : ((Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0] ??
-          "it-global") as ScorePertinence["categorie"]);
+  const categorie = (Object.entries(votes).sort((a, b) => b[1] - a[1])[0]?.[0] ??
+    "it-global") as ScorePertinence["categorie"];
 
   return {
     score: Math.max(0, Math.min(100, brut)),

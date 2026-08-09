@@ -1,4 +1,7 @@
 // Geocodage via l'API Adresse (data.gouv.fr), publique et sans cle.
+// Surchargeable pour les tests locaux (voir scripts/faux-services.mjs).
+const BASE = process.env.API_ADRESSE_URL ?? "https://api-adresse.data.gouv.fr";
+
 export type Coordonnees = { lat: number; lon: number; ville: string; codePostal?: string };
 
 type ReponseGeo = {
@@ -24,7 +27,7 @@ export function normaliserGeocodage(data: ReponseGeo): Coordonnees | null {
 
 export async function geocoder(requete: string, signal?: AbortSignal): Promise<Coordonnees | null> {
   const res = await fetch(
-    `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(requete)}&limit=1`,
+    `${BASE}/search/?q=${encodeURIComponent(requete)}&limit=1`,
     { cache: "no-store", signal }
   );
   if (!res.ok) throw new Error(`API Adresse ${res.status}`);
