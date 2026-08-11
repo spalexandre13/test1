@@ -19,8 +19,22 @@ le pipeline.
 
 ## Installation
 
+### Windows (PowerShell) — à faire une fois
+
+PowerShell refuse par défaut d'exécuter `npm.ps1`. Débloque-le pour ton compte
+uniquement (aucun droit administrateur nécessaire) :
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Alternative sans rien changer au système : utiliser `npm.cmd` au lieu de `npm`.
+
+### Toutes plateformes
+
 ```bash
-cd crm-alternance
+git clone -b claude/job-application-crm-Ykn7B https://github.com/spalexandre13/BouzuSec.git
+cd BouzuSec/crm-alternance
 cp .env.example .env        # puis remplis les valeurs (voir plus bas)
 npm install
 npm run db:local            # crée prisma/dev.db (SQLite)
@@ -252,7 +266,9 @@ expédier.
 | `Impossible de joindre smtp.gmail.com` | Pare-feu/antivirus bloque le port 465. |
 | `GROQ_API_KEY manquante` | Renseigne la clé, ou passe `AI_PROVIDER=ollama`. |
 | Erreur Puppeteer / Chromium | `npx puppeteer browsers install chrome`, ou renseigne `PUPPETEER_EXECUTABLE_PATH`. |
-| `Environment variable not found: DATABASE_URL` | Le `.env` n'existe pas : `cp .env.example .env`. |
+| `Environment variable not found: DATABASE_URL` | Le `.env` n'existe pas : `cp .env.example .env` (PowerShell : `Copy-Item .env.example .env`). |
+| `l'exécution de scripts est désactivée sur ce système` | PowerShell bloque `npm.ps1` : lance `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, ou utilise `npm.cmd`. |
+| `Could not read package.json` | Tu n'es pas dans le bon dossier : `cd BouzuSec/crm-alternance`. |
 | Aucun contact trouvé | Le site n'expose peut-être rien d'exploitable. Colle une URL plus précise (page contact) et relance. |
 
 ## Architecture
