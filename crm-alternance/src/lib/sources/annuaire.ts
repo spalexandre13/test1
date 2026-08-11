@@ -18,6 +18,12 @@ export const NAF_CIBLES = [
 type ReponseAnnuaire = {
   results?: Array<Record<string, any>>;
   total_results?: number;
+  total_pages?: number;
+};
+
+export type PageAnnuaire = {
+  entreprises: EntrepriseBrute[];
+  totalDisponible: number;
 };
 
 export function normaliserResultatsAnnuaire(data: ReponseAnnuaire): EntrepriseBrute[] {
@@ -71,14 +77,13 @@ export function departementDepuisCodePostal(cp?: string): string | undefined {
   return cp.startsWith("97") || cp.startsWith("98") ? cp.slice(0, 3) : cp.slice(0, 2);
 }
 
-export async function chercherAnnuaire(opts: {
+function construireParams(opts: {
   codePostal?: string;
   departement?: string;
   naf?: string[];
   perPage?: number;
   page?: number;
-  signal?: AbortSignal;
-}): Promise<EntrepriseBrute[]> {
+}): URLSearchParams {
   const params = new URLSearchParams();
   // L'API accepte une liste de codes NAF separes par des virgules.
   params.set("activite_principale", (opts.naf ?? NAF_CIBLES).map(nafPourApi).join(","));
@@ -91,13 +96,58 @@ export async function chercherAnnuaire(opts: {
   // reellement satisfait le filtre geographique.
   params.set("limite_matching_etablissements", "1");
 
-  const res = await fetch(`${BASE}?${params.toString()}`, {
+  return params;
+}
+
+async function chercherPage(
+  opts: { codePostal?: string; departement?: string; naf?: string[]; perPage?: number; page?: number },
+  signal?: AbortSignal
+): Promise<{ entreprises: EntrepriseBrute[]; total: number }> {
+  const res = await fetch(`${BASE}?${construireParams(opts).toString()}`, {
     headers: { accept: "application/json" },
     cache: "no-store",
-    signal: opts.signal
+    signal
   });
   if (!res.ok) {
     throw new Error(`Annuaire entreprises ${res.status} : ${await res.text()}`);
   }
-  return normaliserResultatsAnnuaire((await res.json()) as ReponseAnnuaire);
+  const data = (await res.json()) as ReponseAnnuaire;
+  return {
+    entreprises: normaliserResultatsAnnuaire(data),
+    total: Number(data.total_results ?? 0)
+  };
+}
+
+export async function chercherAnnuaire(opts: {
+  codePostal?: string;
+  departement?: string;
+  naf?: string[];
+  perPage?: number;
+  page?: number;
+  /** Nombre de pages a parcourir. L'API classe les grosses structures en tete :
+   *  sans plusieurs pages, aucune PME n'apparait jamais dans l'echantillon. */
+  pages?: number;
+  signal?: AbortSignal;
+}): Promise<EntrepriseBrute[]> {
+  const nbPages = Math.max(1, Math.min(opts.pages ?? 1, 10));
+  const premiere = await chercherPage({ ...opts, page: opts.page ?? 1 }, opts.signal);
+  if (nbPages === 1 || premiere.entreprises.length === 0) return premiere.entreprises;
+
+  const perPage = Math.min(opts.perPage ?? 25, 25);
+  const pagesRestantes = Math.min(nbPages, Math.ceil(premiere.total / perPage)) - 1;
+  if (pagesRestantes <= 0) return premiere.entreprises;
+
+  const suivantes = await Promise.allSettled(
+    Array.from({ length: pagesRestantes }, (_, i) =>
+      chercherPage({ ...opts, page: (opts.page ?? 1) + i + 1 }, opts.signal)
+    )
+  );
+
+  const tout = [...premiere.entreprises];
+  for (const r of suivantes) {
+    if (r.status === "fulfilled") tout.push(...r.value.entreprises);
+  }
+  // Une meme entreprise peut apparaitre sur deux pages : on dedoublonne ici.
+  const parCle = new Map(tout.map((e) => [e.cle, e]));
+  return [...parCle.values()];
 }

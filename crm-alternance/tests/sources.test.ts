@@ -301,3 +301,26 @@ test("departementDepuisCodePostal gere metropole, outre-mer et Corse", async () 
   assert.equal(departementDepuisCodePostal("abc"), undefined);
   assert.equal(departementDepuisCodePostal(undefined), undefined);
 });
+
+test("normaliserResultatsAnnuaire lit total_results sans casser", async () => {
+  const { normaliserResultatsAnnuaire } = await import("../src/lib/sources/annuaire");
+  const out = normaliserResultatsAnnuaire({
+    total_results: 842,
+    results: [
+      { siren: "1", nom_complet: "A", activite_principale: "62.02A", siege: { siret: "1a", code_postal: "06560" } },
+      { siren: "2", nom_complet: "B", activite_principale: "62.03Z", siege: { siret: "2b", code_postal: "06600" } }
+    ]
+  });
+  assert.equal(out.length, 2);
+  assert.equal(out[0].nom, "A");
+});
+
+test("fusionnerListes dedoublonne les entreprises vues sur plusieurs pages", () => {
+  // La pagination peut renvoyer deux fois la meme entreprise.
+  const page1 = [{ cle: "siret:1", nom: "PME", siret: "1", naf: "6202A", source: "annuaire" as const }];
+  const page2 = [{ cle: "siret:1", nom: "PME", siret: "1", effectif: "12", source: "annuaire" as const }];
+  const out = fusionnerListes([page1, page2]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].naf, "6202A");
+  assert.equal(out[0].effectif, "12", "les informations des deux pages sont conservees");
+});

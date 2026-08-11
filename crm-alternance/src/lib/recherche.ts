@@ -95,7 +95,8 @@ export async function rechercher(opts: OptionsRecherche): Promise<RapportRecherc
       departement: departementDepuisCodePostal(centre?.codePostal),
       codePostal: departementDepuisCodePostal(centre?.codePostal) ? undefined : centre?.codePostal,
       naf: opts.naf ?? NAF_CIBLES,
-      perPage: 25
+      perPage: 25,
+      pages: 6
     }),
     // L'API publique de La Bonne Alternance ne repond plus sans cle : on ne
     // l'interroge que si LBA_API_KEY est renseigne, pour ne pas afficher un
