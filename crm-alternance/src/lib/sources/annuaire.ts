@@ -26,16 +26,24 @@ export function normaliserResultatsAnnuaire(data: ReponseAnnuaire): EntrepriseBr
 
   for (const r of rows) {
     const siege = (r.siege ?? {}) as Record<string, any>;
-    const nom =
-      r.nom_complet ?? r.nom_raison_sociale ?? siege.nom_complet ?? "";
+    // Le filtre code_postal / departement porte sur les ETABLISSEMENTS, pas sur
+    // le siege. Sans cette preference, un groupe national dont une agence est
+    // a cote de chez soi s'affiche avec l'adresse de son siege a Paris, et la
+    // distance calculee est fausse de plusieurs centaines de kilometres.
+    const etablissements = Array.isArray(r.matching_etablissements)
+      ? (r.matching_etablissements as Array<Record<string, any>>)
+      : [];
+    const local = etablissements[0] ?? siege;
+
+    const nom = r.nom_complet ?? r.nom_raison_sociale ?? siege.nom_complet ?? "";
     if (!nom) continue;
 
-    const codePostal = siege.code_postal ? String(siege.code_postal) : undefined;
-    const siret = siege.siret ? String(siege.siret) : undefined;
+    const codePostal = local.code_postal ? String(local.code_postal) : undefined;
+    const siret = local.siret ? String(local.siret) : siege.siret ? String(siege.siret) : undefined;
     const siren = r.siren ? String(r.siren) : undefined;
 
-    const lat = Number(siege.latitude);
-    const lon = Number(siege.longitude);
+    const lat = Number(local.latitude ?? siege.latitude);
+    const lon = Number(local.longitude ?? siege.longitude);
 
     out.push({
       cle: cleDedoublonnage({ siret, siren, nom, codePostal }),
@@ -44,8 +52,8 @@ export function normaliserResultatsAnnuaire(data: ReponseAnnuaire): EntrepriseBr
       siren,
       naf: normaliserNaf(r.activite_principale ?? siege.activite_principale),
       nafLibelle: r.libelle_activite_principale ?? siege.libelle_activite_principale,
-      adresse: siege.adresse ? String(siege.adresse) : undefined,
-      ville: siege.libelle_commune ? String(siege.libelle_commune) : undefined,
+      adresse: local.adresse ? String(local.adresse) : undefined,
+      ville: local.libelle_commune ? String(local.libelle_commune) : undefined,
       codePostal,
       lat: Number.isFinite(lat) ? lat : undefined,
       lon: Number.isFinite(lon) ? lon : undefined,
@@ -54,6 +62,13 @@ export function normaliserResultatsAnnuaire(data: ReponseAnnuaire): EntrepriseBr
     });
   }
   return out;
+}
+
+// Le departement se deduit du code postal (Corse mise a part, traitee a part).
+export function departementDepuisCodePostal(cp?: string): string | undefined {
+  if (!cp || !/^\d{5}$/.test(cp)) return undefined;
+  if (cp.startsWith("20")) return undefined; // 2A / 2B : ambigu, on s'abstient
+  return cp.startsWith("97") || cp.startsWith("98") ? cp.slice(0, 3) : cp.slice(0, 2);
 }
 
 export async function chercherAnnuaire(opts: {
@@ -72,6 +87,9 @@ export async function chercherAnnuaire(opts: {
   params.set("per_page", String(Math.min(opts.perPage ?? 25, 25)));
   params.set("page", String(opts.page ?? 1));
   params.set("etat_administratif", "A"); // uniquement les entreprises actives
+  // Indispensable : sans cela l'API ne renvoie pas les etablissements qui ont
+  // reellement satisfait le filtre geographique.
+  params.set("limite_matching_etablissements", "1");
 
   const res = await fetch(`${BASE}?${params.toString()}`, {
     headers: { accept: "application/json" },

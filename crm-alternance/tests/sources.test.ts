@@ -237,3 +237,67 @@ test("le geocodage signale un resultat douteux au lieu de l'accepter", () => {
   );
   assert.equal(sur!.avertissement, undefined);
 });
+
+test("l'annuaire retient l'etablissement local, pas le siege social", async () => {
+  const { normaliserResultatsAnnuaire } = await import("../src/lib/sources/annuaire");
+  // Cas reel : ORANGE remonte pour le 06 via une agence, mais son siege est a
+  // Issy-les-Moulineaux. Retenir le siege fausserait la ville ET la distance.
+  const fixture = {
+    results: [
+      {
+        siren: "380129866",
+        nom_complet: "ORANGE",
+        activite_principale: "61.10Z",
+        siege: {
+          siret: "38012986600001",
+          adresse: "111 QUAI DU PRESIDENT ROOSEVELT 92130 ISSY-LES-MOULINEAUX",
+          code_postal: "92130",
+          libelle_commune: "ISSY-LES-MOULINEAUX",
+          latitude: "48.8236",
+          longitude: "2.2674"
+        },
+        matching_etablissements: [
+          {
+            siret: "38012986612345",
+            adresse: "1 AVENUE ALBERT EINSTEIN 06560 VALBONNE",
+            code_postal: "06560",
+            libelle_commune: "VALBONNE",
+            latitude: "43.6234",
+            longitude: "7.0489"
+          }
+        ]
+      }
+    ]
+  };
+  const [e] = normaliserResultatsAnnuaire(fixture);
+  assert.equal(e.ville, "VALBONNE", "la ville doit etre celle de l'etablissement");
+  assert.equal(e.codePostal, "06560");
+  assert.equal(e.lat, 43.6234, "coordonnees locales, sinon la distance est fausse");
+  assert.equal(e.siret, "38012986612345");
+});
+
+test("l'annuaire retombe sur le siege quand aucun etablissement ne correspond", async () => {
+  const { normaliserResultatsAnnuaire } = await import("../src/lib/sources/annuaire");
+  const [e] = normaliserResultatsAnnuaire({
+    results: [
+      {
+        siren: "123",
+        nom_complet: "PME LOCALE",
+        activite_principale: "62.02A",
+        siege: { siret: "12300001", code_postal: "06600", libelle_commune: "ANTIBES", latitude: 43.58, longitude: 7.12 }
+      }
+    ]
+  });
+  assert.equal(e.ville, "ANTIBES");
+  assert.equal(e.codePostal, "06600");
+});
+
+test("departementDepuisCodePostal gere metropole, outre-mer et Corse", async () => {
+  const { departementDepuisCodePostal } = await import("../src/lib/sources/annuaire");
+  assert.equal(departementDepuisCodePostal("06560"), "06");
+  assert.equal(departementDepuisCodePostal("75001"), "75");
+  assert.equal(departementDepuisCodePostal("97400"), "974");
+  assert.equal(departementDepuisCodePostal("20000"), undefined, "Corse ambigue : on s'abstient");
+  assert.equal(departementDepuisCodePostal("abc"), undefined);
+  assert.equal(departementDepuisCodePostal(undefined), undefined);
+});

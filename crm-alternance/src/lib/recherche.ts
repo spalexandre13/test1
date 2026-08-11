@@ -1,5 +1,5 @@
 // Orchestrateur de recherche : annuaire + LBA -> fusion -> scoring -> tri.
-import { chercherAnnuaire, NAF_CIBLES } from "./sources/annuaire";
+import { chercherAnnuaire, NAF_CIBLES, departementDepuisCodePostal } from "./sources/annuaire";
 import { chercherLba } from "./sources/lba";
 import { geocoder, type Coordonnees } from "./sources/geocode";
 import type { EntrepriseBrute } from "./sources/types";
@@ -88,12 +88,18 @@ export async function rechercher(opts: OptionsRecherche): Promise<RapportRecherc
   // Les deux sources sont interrogees en parallele ; l'echec de l'une ne doit
   // pas vider le resultat de l'autre.
   const [annuaire, lba] = await Promise.allSettled([
+    // Un seul code postal est trop restrictif : on ratisse le departement et
+    // c'est le score de proximite qui remet les plus proches en tete.
     chercherAnnuaire({
-      codePostal: centre?.codePostal,
+      departement: departementDepuisCodePostal(centre?.codePostal),
+      codePostal: departementDepuisCodePostal(centre?.codePostal) ? undefined : centre?.codePostal,
       naf: opts.naf ?? NAF_CIBLES,
       perPage: 25
     }),
-    centre
+    // L'API publique de La Bonne Alternance ne repond plus sans cle : on ne
+    // l'interroge que si LBA_API_KEY est renseigne, pour ne pas afficher un
+    // echec a chaque recherche alors que la source est facultative.
+    centre && process.env.LBA_API_KEY
       ? chercherLba({ lat: centre.lat, lon: centre.lon, rayonKm: opts.rayonKm ?? 30 })
       : Promise.resolve([])
   ]);
