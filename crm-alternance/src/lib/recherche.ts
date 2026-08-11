@@ -49,7 +49,8 @@ export function classer(
         description: e.nafLibelle,
         proposeAlternance: e.proposeAlternance,
         aContact: Boolean(e.emailContact || e.telephone),
-        distanceKm: d
+        distanceKm: d,
+        effectif: e.effectif
       });
       return { ...e, pertinence, distanceKm: d };
     })

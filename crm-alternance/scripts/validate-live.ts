@@ -13,6 +13,7 @@ import { geocoder } from "../src/lib/sources/geocode";
 import { chercherAnnuaire } from "../src/lib/sources/annuaire";
 import { chercherLba } from "../src/lib/sources/lba";
 import { rechercher } from "../src/lib/recherche";
+import { libelleEffectif } from "../src/lib/domaine";
 import { recupererPagesContact } from "../src/lib/enrichment/scraper";
 import { agregerContacts } from "../src/lib/enrichment/contacts";
 import { verifierSmtp } from "../src/lib/mailer";
@@ -79,8 +80,11 @@ async function main() {
     for (const e of rapport.sourcesEnEchec) ko(`source en echec : ${e.source} -> ${e.raison}`);
     console.log(`        ${rapport.resultats.length} entreprise(s) classee(s) :`);
     for (const r of rapport.resultats.slice(0, 10)) {
+      const taille = libelleEffectif(r.effectif) ?? "taille inconnue";
+      const dist = typeof r.distanceKm === "number" ? `${Math.round(r.distanceKm)} km` : "-";
       console.log(
-        `        ${String(r.pertinence.score).padStart(3)} | ${r.pertinence.categorie.padEnd(10)} | ${r.nom}`
+        `        ${String(r.pertinence.score).padStart(3)} | ${r.pertinence.categorie.padEnd(10)} | ` +
+          `${dist.padStart(6)} | ${(r.ville ?? "?").padEnd(18)} | ${taille.padEnd(22)} | ${r.nom}`
       );
     }
   }

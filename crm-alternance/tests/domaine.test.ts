@@ -173,3 +173,59 @@ test("une entreprise du domaine conserve bien ses bonus", () => {
   });
   assert.ok(avecBonus.score > nu.score, "les bonus doivent s'appliquer au domaine");
 });
+
+test("une boutique d'operateur ne remonte pas dans une recherche technique", () => {
+  // Cas reels observes : ces entites portent un code NAF telecom mais ne
+  // proposent aucun poste reseau.
+  for (const nom of [
+    "RESEAU CLUBS BOUYGUES TELECOM (RCBT)",
+    "ORANGE STORE",
+    "SFR DISTRIBUTION BOUTIQUE"
+  ]) {
+    const r = scorerEntreprise({ nom, naf: "6120Z", description: "Telecommunications sans fil" });
+    assert.equal(r.score, 0, `"${nom}" ne doit pas remonter (score ${r.score})`);
+    assert.equal(r.categorie, "hors-domaine");
+  }
+});
+
+test("un exploitant telecom reste bien classe", () => {
+  const r = scorerEntreprise({
+    nom: "EXA INFRASTRUCTURE FRANCE",
+    naf: "6110Z",
+    description: "Telecommunications filaires, deploiement fibre"
+  });
+  assert.ok(r.score >= 50, `score trop bas : ${r.score}`);
+  assert.equal(r.categorie, "telecom");
+});
+
+test("la securite physique n'est pas classee en cybersecurite", () => {
+  // 8020Z = alarmes et videosurveillance. Verisure et Securitas remontaient
+  // en tete d'une recherche cyber a cause de ce code.
+  const alarme = scorerEntreprise({
+    nom: "VERISURE",
+    naf: "8020Z",
+    description: "Activites liees aux systemes de securite"
+  });
+  assert.notEqual(alarme.categorie, "cyber", "l'alarme residentielle n'est pas du cyber");
+
+  // Une vraie entreprise cyber doit rester devant.
+  const cyber = scorerEntreprise({
+    nom: "CyberDefense Sud",
+    naf: "6202A",
+    description: "SOC, pentest et audit de cybersecurite"
+  });
+  assert.equal(cyber.categorie, "cyber");
+  assert.ok(cyber.score > alarme.score, `${cyber.score} doit depasser ${alarme.score}`);
+});
+
+test("le critere de taille favorise les PME sans exclure les grands groupes", () => {
+  const base = { nom: "Integrateur Reseau", naf: "6202A", description: "infogerance reseau" };
+  const pme = scorerEntreprise({ ...base, effectif: "12" });      // 20 a 49
+  const tpe = scorerEntreprise({ ...base, effectif: "00" });      // aucun salarie
+  const groupe = scorerEntreprise({ ...base, effectif: "53" });   // 10 000+
+
+  assert.ok(pme.score > groupe.score, "une PME doit passer devant un grand groupe");
+  assert.ok(pme.score > tpe.score, "une PME doit passer devant une structure sans salarie");
+  assert.ok(groupe.score > 0, "un grand groupe reste dans les resultats");
+  assert.ok(pme.signaux.some((s) => /20 a 49/.test(s.libelle)), "le critere doit etre visible");
+});

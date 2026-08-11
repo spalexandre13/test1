@@ -26,7 +26,10 @@ export const NAF_PERTINENTS: Record<string, { points: number; libelle: string; c
   "2630Z": { points: 25, libelle: "Fabrication d'equipements de communication", cat: "telecom" },
   "2620Z": { points: 18, libelle: "Fabrication d'ordinateurs et equipements peripheriques", cat: "it-global" },
   "4321A": { points: 22, libelle: "Travaux d'installation electrique / reseaux", cat: "reseau" },
-  "8020Z": { points: 30, libelle: "Activites liees aux systemes de securite", cat: "cyber" },
+  // 8020Z couvre les alarmes et la videosurveillance : c'est de la securite
+  // PHYSIQUE. La classer en cyber faisait remonter Verisura et Securitas en
+  // tete d'une recherche cybersecurite.
+  "8020Z": { points: 8, libelle: "Systemes de securite (alarme, videosurveillance)", cat: "it-global" },
   "7112B": { points: 15, libelle: "Ingenierie, etudes techniques", cat: "it-global" },
   "9511Z": { points: 12, libelle: "Reparation d'ordinateurs et equipements", cat: "it-global" },
   "4652Z": { points: 12, libelle: "Commerce de gros de composants electroniques", cat: "telecom" },
@@ -71,6 +74,48 @@ export function normaliser(texte: string): string {
     .trim();
 }
 
+// Eliminatoires : un point de vente d'operateur porte le meme code NAF qu'un
+// exploitant de reseau et son nom contient souvent « reseau » ou « telecom »,
+// ce qui suffirait a le faire remonter. Aucune boutique ne propose de poste
+// technique : on l'ecarte sans discuter plutot que de la penaliser.
+const MOTS_ELIMINATOIRES = [
+  "store", "boutique", "magasin", "club", "clubs",
+  "interim", "travail temporaire", "placement"
+];
+
+// Penalisants : le doute reste permis (un grossiste en composants peut
+// proposer de la technique), on retire des points sans exclure.
+const MOTS_PENALISANTS: Array<{ mots: string[]; points: number; libelle: string }> = [
+  { mots: ["distribution", "commerce", "vente"], points: -20, libelle: "Activite commerciale" },
+  { mots: ["immobilier", "assurance", "banque"], points: -25, libelle: "Hors informatique" }
+];
+
+// Tranches d'effectif INSEE. Une candidature spontanee aboutit bien plus
+// souvent dans une PME structuree que dans un groupe de plusieurs milliers.
+const BONUS_EFFECTIF: Record<string, { points: number; libelle: string }> = {
+  "00": { points: -8, libelle: "Aucun salarie" },
+  "01": { points: -5, libelle: "1 a 2 salaries" },
+  "02": { points: 0, libelle: "3 a 5 salaries" },
+  "03": { points: 4, libelle: "6 a 9 salaries" },
+  "11": { points: 10, libelle: "10 a 19 salaries" },
+  "12": { points: 12, libelle: "20 a 49 salaries" },
+  "21": { points: 12, libelle: "50 a 99 salaries" },
+  "22": { points: 10, libelle: "100 a 199 salaries" },
+  "31": { points: 8, libelle: "200 a 249 salaries" },
+  "32": { points: 6, libelle: "250 a 499 salaries" },
+  "41": { points: 2, libelle: "500 a 999 salaries" },
+  "42": { points: 0, libelle: "1000 a 1999 salaries" },
+  "51": { points: -5, libelle: "2000 a 4999 salaries" },
+  "52": { points: -8, libelle: "5000 a 9999 salaries" },
+  "53": { points: -10, libelle: "10 000 salaries et plus" }
+};
+
+/** Libelle lisible d'une tranche d'effectif INSEE. */
+export function libelleEffectif(code?: string): string | undefined {
+  if (!code) return undefined;
+  return BONUS_EFFECTIF[code]?.libelle;
+}
+
 export type EntreeScoring = {
   nom: string;
   naf?: string;
@@ -78,6 +123,8 @@ export type EntreeScoring = {
   proposeAlternance?: boolean;
   aContact?: boolean;
   distanceKm?: number;
+  /** Code de tranche d'effectif INSEE (ex. "12" pour 20 a 49 salaries). */
+  effectif?: string;
 };
 
 export function scorerEntreprise(e: EntreeScoring): ScorePertinence {
@@ -111,6 +158,24 @@ export function scorerEntreprise(e: EntreeScoring): ScorePertinence {
     }
   }
 
+  const contient = (mot: string) =>
+    new RegExp(`(^|[^a-z0-9])${normaliser(mot)}([^a-z0-9]|$)`).test(texte);
+
+  if (MOTS_ELIMINATOIRES.some(contient)) {
+    return { score: 0, categorie: "hors-domaine", signaux: [] };
+  }
+
+  for (const d of MOTS_PENALISANTS) {
+    if (d.mots.some(contient)) {
+      brut += d.points;
+      signaux.push({ libelle: d.libelle, points: d.points });
+    }
+  }
+
+  if (brut <= 0) {
+    return { score: 0, categorie: "hors-domaine", signaux: [] };
+  }
+
   // Les bonus qui suivent ne qualifient PAS le metier : sans le moindre signal
   // NAF ou mot-cle, l'entreprise est hors-domaine et ne doit pas remonter
   // (sinon une boulangerie proche apparaitrait dans une recherche reseau).
@@ -127,6 +192,14 @@ export function scorerEntreprise(e: EntreeScoring): ScorePertinence {
     brut += 10;
     signaux.push({ libelle: "Contact direct disponible", points: 10 });
   }
+  if (e.effectif) {
+    const tranche = BONUS_EFFECTIF[e.effectif];
+    if (tranche && tranche.points !== 0) {
+      brut += tranche.points;
+      signaux.push({ libelle: tranche.libelle, points: tranche.points });
+    }
+  }
+
   if (typeof e.distanceKm === "number") {
     // Proximite : jusqu'a +10 pour du tres proche, 0 au-dela de 50 km.
     const pts = Math.max(0, Math.round(10 - e.distanceKm / 5));
