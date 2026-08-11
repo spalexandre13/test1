@@ -1,12 +1,11 @@
-// API "La Bonne Alternance". Utilisee comme source COMPLEMENTAIRE : elle
-// apporte le signal "cette entreprise recrute en alternance" et parfois un
-// email de contact, la ou l'annuaire n'a aucune donnee de contact.
+// API "La Bonne Alternance". Source COMPLEMENTAIRE : elle apporte le signal
+// « cette entreprise recrute en alternance » et parfois un email de contact.
 //
-// Le format de reponse a change entre les versions de l'API ; la normalisation
-// ci-dessous accepte plusieurs formes pour ne pas casser silencieusement.
+// L'API a change d'adresse au fil du temps (l'ancien /api/v1/jobs/company
+// renvoie 404). On essaie donc plusieurs points d'entree connus et on signale
+// precisement ce qui a ete tente si aucun ne repond.
 import { type EntrepriseBrute, normaliserNaf, cleDedoublonnage } from "./types";
 
-// Surchargeable pour les tests locaux.
 const BASE = process.env.LBA_URL ?? "https://labonnealternance.apprentissage.beta.gouv.fr";
 
 export const ROME_RT = ["M1810", "M1802", "M1801", "M1805", "I1401", "M1803"];
@@ -19,9 +18,7 @@ type ReponseLba = {
 
 function versTableau(x: unknown): Array<Record<string, any>> {
   if (Array.isArray(x)) return x as Array<Record<string, any>>;
-  if (x && typeof x === "object" && Array.isArray((x as any).results)) {
-    return (x as any).results;
-  }
+  if (x && typeof x === "object" && Array.isArray((x as any).results)) return (x as any).results;
   return [];
 }
 
@@ -62,11 +59,20 @@ export function normaliserResultatsLba(data: ReponseLba): EntrepriseBrute[] {
       emailContact: contact.email ? String(contact.email) : undefined,
       telephone: contact.phone ? String(contact.phone) : undefined,
       effectif: company.size ? String(company.size) : undefined,
-      proposeAlternance: true, // c'est tout l'interet de cette source
+      proposeAlternance: true,
       source: "lba"
     });
   }
   return out;
+}
+
+// Points d'entree essayes dans l'ordre. Le premier qui repond gagne.
+export function cheminsCandidats(params: URLSearchParams): string[] {
+  return [
+    `${BASE}/api/v1/jobs/company?${params}`,
+    `${BASE}/api/v1/jobs?${params}`,
+    `${BASE}/api/jobs/company?${params}`
+  ];
 }
 
 export async function chercherLba(opts: {
@@ -87,10 +93,20 @@ export async function chercherLba(opts: {
   const headers: Record<string, string> = { accept: "application/json" };
   if (process.env.LBA_API_KEY) headers.authorization = `Bearer ${process.env.LBA_API_KEY}`;
 
-  const res = await fetch(
-    `${BASE}/api/v1/jobs/company?${params}`,
-    { headers, cache: "no-store", signal: opts.signal }
+  const echecs: string[] = [];
+  for (const url of cheminsCandidats(params)) {
+    try {
+      const res = await fetch(url, { headers, cache: "no-store", signal: opts.signal });
+      if (res.ok) return normaliserResultatsLba((await res.json()) as ReponseLba);
+      echecs.push(`${new URL(url).pathname} -> HTTP ${res.status}`);
+    } catch (e) {
+      echecs.push(`${new URL(url).pathname} -> ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  throw new Error(
+    `Aucun point d'entrée n'a répondu (${echecs.join(" ; ")}). ` +
+      `Cette source est optionnelle : la recherche fonctionne sans elle. ` +
+      `Si l'API exige désormais une clé, renseigne LBA_API_KEY dans .env.`
   );
-  if (!res.ok) throw new Error(`La Bonne Alternance ${res.status} : ${await res.text()}`);
-  return normaliserResultatsLba((await res.json()) as ReponseLba);
 }

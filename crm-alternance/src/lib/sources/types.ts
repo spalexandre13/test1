@@ -25,6 +25,12 @@ export function normaliserNaf(naf?: string | null): string | undefined {
   return /^\d{4}[A-Z]$/.test(c) ? c : undefined;
 }
 
+// L'API "recherche-entreprises" attend le format pointe : 62.02A, pas 6202A.
+export function nafPourApi(code: string): string {
+  const c = code.replace(/[.\s]/g, "").toUpperCase();
+  return /^\d{4}[A-Z]$/.test(c) ? `${c.slice(0, 2)}.${c.slice(2)}` : c;
+}
+
 export function cleDedoublonnage(e: {
   siret?: string;
   siren?: string;

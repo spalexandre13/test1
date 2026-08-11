@@ -43,6 +43,8 @@ export default function SourcingPage() {
   const [rayon, setRayon] = useState(30);
   const [resultats, setResultats] = useState<Resultat[]>([]);
   const [echecs, setEchecs] = useState<Array<{ source: string; raison: string }>>([]);
+  const [avertissement, setAvertissement] = useState<string | null>(null);
+  const [centre, setCentre] = useState<{ libelle: string; codePostal?: string } | null>(null);
   const [chargement, setChargement] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -63,6 +65,8 @@ export default function SourcingPage() {
       if (!r.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
       setResultats(data.resultats ?? []);
       setEchecs(data.sourcesEnEchec ?? []);
+      setAvertissement(data.avertissement ?? null);
+      setCentre(data.centre ? { libelle: data.centre.libelle, codePostal: data.centre.codePostal } : null);
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "Erreur inconnue");
     } finally {
@@ -176,6 +180,19 @@ export default function SourcingPage() {
       </div>
 
       {erreur && <div className="card p-3 bg-red-50 border-red-200 text-red-700 text-sm">{erreur}</div>}
+
+      {centre && !avertissement && (
+        <div className="text-sm text-slate-500">
+          Recherche autour de <b>{centre.libelle}</b>
+          {centre.codePostal ? ` (${centre.codePostal})` : ""}.
+        </div>
+      )}
+
+      {avertissement && (
+        <div className="card p-3 bg-amber-50 border-amber-200 text-amber-800 text-sm">
+          <b>Vérifie la localisation.</b> {avertissement}
+        </div>
+      )}
 
       {echecs.length > 0 && (
         <div className="card p-3 bg-amber-50 border-amber-200 text-amber-800 text-sm">

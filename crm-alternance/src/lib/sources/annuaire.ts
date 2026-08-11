@@ -1,7 +1,7 @@
 // API "Recherche d'entreprises" (annuaire-entreprises.data.gouv.fr).
 // Publique, sans cle. Meilleure source pour cibler par code NAF + localisation.
 // Doc : https://recherche-entreprises.api.gouv.fr/docs
-import { type EntrepriseBrute, normaliserNaf, cleDedoublonnage } from "./types";
+import { type EntrepriseBrute, normaliserNaf, cleDedoublonnage, nafPourApi } from "./types";
 
 // Surchargeable pour les tests locaux.
 const BASE = `${process.env.ANNUAIRE_URL ?? "https://recherche-entreprises.api.gouv.fr"}/search`;
@@ -66,7 +66,7 @@ export async function chercherAnnuaire(opts: {
 }): Promise<EntrepriseBrute[]> {
   const params = new URLSearchParams();
   // L'API accepte une liste de codes NAF separes par des virgules.
-  params.set("activite_principale", (opts.naf ?? NAF_CIBLES).join(","));
+  params.set("activite_principale", (opts.naf ?? NAF_CIBLES).map(nafPourApi).join(","));
   if (opts.codePostal) params.set("code_postal", opts.codePostal);
   if (opts.departement) params.set("departement", opts.departement);
   params.set("per_page", String(Math.min(opts.perPage ?? 25, 25)));

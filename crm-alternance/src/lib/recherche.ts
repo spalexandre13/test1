@@ -68,6 +68,8 @@ export type RapportRecherche = {
   centre: Coordonnees | null;
   resultats: ResultatRecherche[];
   sourcesEnEchec: Array<{ source: string; raison: string }>;
+  /** Localisation douteuse : la recherche porterait au mauvais endroit. */
+  avertissement?: string;
 };
 
 export async function rechercher(opts: OptionsRecherche): Promise<RapportRecherche> {
@@ -121,5 +123,5 @@ export async function rechercher(opts: OptionsRecherche): Promise<RapportRecherc
     opts.limite ?? 40
   );
 
-  return { centre, resultats, sourcesEnEchec };
+  return { centre, resultats, sourcesEnEchec, avertissement: centre?.avertissement };
 }

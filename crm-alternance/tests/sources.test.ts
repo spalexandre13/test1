@@ -91,11 +91,11 @@ test("normaliserGeocodage extrait lat/lon dans le bon ordre", () => {
     features: [
       {
         geometry: { coordinates: [7.0489, 43.6234] as [number, number] },
-        properties: { city: "Valbonne", postcode: "06560" }
+        properties: { city: "Valbonne", postcode: "06560", score: 0.97, label: "Valbonne" }
       }
     ]
   };
-  const c = normaliserGeocodage(fixture);
+  const c = normaliserGeocodage(fixture, "Valbonne");
   assert.ok(c);
   // L'API renvoie [lon, lat] : l'inversion est une erreur classique.
   assert.equal(c!.lat, 43.6234);
@@ -126,7 +126,7 @@ test("fusionnerListes dedoublonne la meme entreprise vue par deux sources", () =
 });
 
 test("classer trie par pertinence et ecarte le hors-domaine", () => {
-  const centre = { lat: 43.62, lon: 7.05, ville: "Valbonne" };
+  const centre = { lat: 43.62, lon: 7.05, ville: "Valbonne", score: 1, libelle: "Valbonne" };
   const out = classer(
     [
       { cle: "a", nom: "Boulangerie Martin", naf: "1071C", source: "annuaire" },
@@ -194,4 +194,46 @@ test("le transport Gmail borne ses timeouts (sinon 2 min de blocage)", async () 
     typeof opts.greetingTimeout === "number" && opts.greetingTimeout <= 15_000,
     `greetingTimeout absent ou trop long : ${opts.greetingTimeout}`
   );
+});
+
+test("nafPourApi produit le format attendu par l'API (62.02A)", async () => {
+  const { nafPourApi } = await import("../src/lib/sources/types");
+  // L'API "recherche-entreprises" rejette 6202A avec une erreur 400.
+  assert.equal(nafPourApi("6202A"), "62.02A");
+  assert.equal(nafPourApi("62.02A"), "62.02A");
+  assert.equal(nafPourApi("6110Z"), "61.10Z");
+  assert.equal(nafPourApi("8020Z"), "80.20Z");
+});
+
+test("le geocodage signale un resultat douteux au lieu de l'accepter", () => {
+  // Cas reel : « Sophia Antipolis » rapproche d'une commune du Calvados.
+  const douteux = normaliserGeocodage(
+    {
+      features: [
+        {
+          geometry: { coordinates: [-0.349323, 49.214568] },
+          properties: { city: "Hérouville-Saint-Clair", postcode: "14200", score: 0.31, label: "Hérouville-Saint-Clair" }
+        }
+      ]
+    },
+    "Sophia Antipolis"
+  );
+  assert.ok(douteux);
+  assert.ok(douteux!.avertissement, "un score faible doit declencher un avertissement");
+  assert.match(douteux!.avertissement!, /incertaine/i);
+  assert.match(douteux!.avertissement!, /Hérouville/);
+
+  // Un score eleve ne doit pas alerter.
+  const sur = normaliserGeocodage(
+    {
+      features: [
+        {
+          geometry: { coordinates: [7.0489, 43.6234] },
+          properties: { city: "Valbonne", postcode: "06560", score: 0.96, label: "Valbonne" }
+        }
+      ]
+    },
+    "Valbonne"
+  );
+  assert.equal(sur!.avertissement, undefined);
 });
